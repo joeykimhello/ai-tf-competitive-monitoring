@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>경쟁사 성장 모니터링 자동화 — AI TF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════
+   THEME: BOLD SIGNAL (dark · electric blue)
+   Based on frontend-slides / zarazhangrui
+═══════════════════════════════════════ */
+:root {
+  --bg:       #111111;
+  --bg2:      #1a1a2e;
+  --surface:  rgba(255,255,255,0.04);
+  --border:   rgba(255,255,255,0.07);
+  --accent:   #4A6CF7;
+  --green:    #34D399;
+  --purple:   #A78BFA;
+  --warn:     #FCD34D;
+  --red:      #F87171;
+  --txt:      #ffffff;
+  --txt2:     rgba(255,255,255,0.62);
+  --txt3:     rgba(255,255,255,0.32);
+  --font-d:   'Archivo Black', sans-serif;
+  --font-b:   'Space Grotesk', sans-serif;
+  --ease:     cubic-bezier(0.16, 1, 0.3, 1);
+  /* clamp scales */
+  --t1: clamp(2rem,   5.5vw, 4.2rem);
+  --t2: clamp(1.4rem, 3.2vw, 2.6rem);
+  --t3: clamp(1rem,   2vw,   1.5rem);
+  --tb: clamp(0.78rem,1.25vw,1rem);
+  --ts: clamp(0.65rem,1vw,   0.85rem);
+  --tl: clamp(0.58rem,0.85vw,0.72rem);
+  --tn: clamp(2.5rem, 7vw,   6rem);
+  --p:  clamp(1.2rem, 3.5vw, 3.2rem);
+  --g:  clamp(0.6rem, 1.5vw, 1.4rem);
+  --ge: clamp(0.35rem,0.8vw, 0.7rem);
+}
+
+*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow-x:hidden; }
+html { scroll-snap-type:y mandatory; scroll-behavior:smooth; }
+body { font-family:var(--font-b); background:var(--bg); color:var(--txt); overflow-x:hidden; }
+
+/* ── Slide base ── */
+.slide {
+  width:100vw; height:100vh; height:100dvh;
+  overflow:hidden; scroll-snap-align:start;
+  display:flex; flex-direction:column; position:relative;
+  background: linear-gradient(135deg,#111111 0%,#1a1a2e 50%,#111111 100%);
+}
+/* subtle grid */
+.slide::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px);
+  background-size:56px 56px;
+}
+
+.slide-inner {
+  flex:1; display:flex; flex-direction:column;
+  padding:var(--p); position:relative; z-index:1; overflow:hidden;
+}
+
+/* ── Slide number (background) ── */
+.sn {
+  position:absolute; top:calc(var(--p)*0.4); left:var(--p);
+  font-family:var(--font-d); font-size:var(--tn);
+  color:rgba(255,255,255,0.05); line-height:1;
+  letter-spacing:-0.04em; pointer-events:none; user-select:none;
+}
+
+/* ── Breadcrumb ── */
+.bc {
+  position:absolute; top:var(--p); right:var(--p);
+  display:flex; gap:5px; align-items:center;
+}
+.bc-item {
+  font-size:var(--tl); font-weight:700; letter-spacing:0.1em;
+  text-transform:uppercase; color:var(--txt3);
+  padding:3px 8px; border-radius:3px;
+  transition:color .3s, background .3s;
+}
+.bc-item.on { color:var(--txt); background:var(--accent); }
+
+/* ── Content area ── */
+.content {
+  flex:1; display:flex; flex-direction:column;
+  justify-content:center; gap:var(--g);
+  padding-top:clamp(2rem,6vh,4.5rem); overflow:hidden;
+}
+
+/* ── Typography ── */
+.lbl {
+  font-size:var(--tl); font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent);
+}
+h1 { font-family:var(--font-d); font-size:var(--t1); line-height:1.1; letter-spacing:-.02em; }
+h2 { font-family:var(--font-d); font-size:var(--t2); line-height:1.15; letter-spacing:-.02em; }
+h3 { font-family:var(--font-b); font-size:var(--t3); font-weight:700; line-height:1.3; }
+p  { font-size:var(--tb); line-height:1.65; color:var(--txt2); }
+code {
+  font-family:'JetBrains Mono','Courier New',monospace;
+  background:rgba(255,255,255,0.07); padding:1px 5px;
+  border-radius:3px; font-size:.9em;
+}
+
+/* ── Cards ── */
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:clamp(.7rem,1.4vw,1.3rem);
+}
+.card.b { border-color:rgba(74,108,247,.35); }
+.card.g { border-color:rgba(52,211,153,.35); }
+.card.p { border-color:rgba(167,139,250,.35); }
+.card.w { border-color:rgba(252,211,77,.35);  }
+.card.r { border-color:rgba(248,113,113,.35); }
+
+/* ── Grid ── */
+.g2 { display:grid; grid-template-columns:1fr 1fr;              gap:var(--ge); }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr;          gap:var(--ge); }
+.g4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr;      gap:var(--ge); }
+.gs { display:grid; grid-template-columns:1.15fr .85fr;         gap:var(--g);  }
+
+/* ── Badge ── */
+.badge {
+  display:inline-flex; align-items:center;
+  font-size:var(--tl); font-weight:700;
+  padding:2px 7px; border-radius:4px; letter-spacing:.04em;
+}
+.bk { background:rgba(74,108,247,.18); color:#818CF8; }
+.bg { background:rgba(52,211,153,.16); color:#34D399;  }
+.bp { background:rgba(167,139,250,.16);color:#A78BFA;  }
+.bw { background:rgba(252,211,77,.16); color:#FCD34D;  }
+.bo { background:rgba(255,255,255,.07);color:var(--txt3); }
+
+/* ── Pipeline ── */
+.pipe { display:flex; align-items:center; gap:var(--ge); flex-wrap:wrap; }
+.pbox {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:7px; padding:clamp(5px,1vh,10px) clamp(7px,1vw,14px);
+  font-size:var(--ts); font-weight:600; text-align:center; flex:1; min-width:64px;
+}
+.pbox.b { border-color:rgba(74,108,247,.4); color:#818CF8; }
+.pbox.g { border-color:rgba(52,211,153,.4); color:#34D399; }
+.pbox.p { border-color:rgba(167,139,250,.4);color:#A78BFA; }
+.pbox.w { border-color:rgba(252,211,77,.4); color:#FCD34D; }
+.parr   { color:var(--txt3); font-size:1.1em; flex-shrink:0; }
+
+/* ── Table ── */
+.tbl { width:100%; border-collapse:collapse; font-size:var(--ts); }
+.tbl thead th {
+  text-align:left; padding:clamp(5px,.8vh,9px) clamp(6px,.8vw,11px);
+  color:var(--accent); font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; font-size:calc(var(--ts)*.88);
+  border-bottom:1px solid var(--border);
+}
+.tbl tbody td {
+  padding:clamp(5px,.8vh,9px) clamp(6px,.8vw,11px);
+  border-bottom:1px solid rgba(255,255,255,.035);
+  color:var(--txt2); vertical-align:middle;
+}
+.tbl tbody tr:hover td { background:rgba(255,255,255,.025); }
+
+/* ── Timeline ── */
+.tl { display:flex; flex-direction:column; gap:var(--ge); }
+.tl-row { display:flex; gap:clamp(10px,1.5vw,16px); align-items:flex-start; }
+.dot {
+  width:clamp(8px,.9vw,11px); height:clamp(8px,.9vw,11px);
+  border-radius:50%; background:var(--accent); flex-shrink:0; margin-top:4px;
+}
+.dot.g { background:var(--green);  }
+.dot.p { background:var(--purple); }
+.dot.w { background:var(--warn);   }
+.tl-txt { font-size:var(--tb); color:var(--txt2); line-height:1.5; }
+.tl-txt strong { color:var(--txt); }
+
+/* ── Terminal / Chat ── */
+.term {
+  background:#0d1117; border:1px solid rgba(255,255,255,.08);
+  border-radius:10px; padding:clamp(9px,1.4vw,16px) clamp(11px,1.7vw,18px);
+  font-family:'JetBrains Mono','Courier New',monospace;
+  font-size:var(--ts); line-height:1.72; overflow:hidden;
+}
+.term .b  { color:#fff; font-weight:700; }
+.term .d  { color:rgba(255,255,255,.38); }
+.term .up { color:#34D399; }
+.term .dn { color:#F87171; }
+.term .nw { color:#FCD34D; }
+.term .bl { color:#818CF8; }
+
+/* ── Stat ── */
+.stat {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:clamp(8px,1.4vh,14px); text-align:center;
+}
+.stat-n {
+  font-family:var(--font-d);
+  font-size:clamp(1.8rem,3.5vw,3rem);
+  line-height:1; color:var(--txt);
+}
+.stat-l { font-size:var(--ts); color:var(--txt2); margin-top:4px; }
+
+/* ── Status row ── */
+.srow {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(6px,1vh,9px) clamp(9px,1.2vw,13px);
+  background:rgba(52,211,153,.07); border-radius:6px;
+  border:1px solid rgba(52,211,153,.18);
+}
+.srow span { font-size:var(--ts); color:var(--txt2); }
+
+hr { border:none; border-top:1px solid var(--border); }
+
+/* ── Animations ── */
+.rev {
+  opacity:0; transform:translateY(26px);
+  transition:opacity .65s var(--ease), transform .65s var(--ease);
+}
+.slide.vis .rev             { opacity:1; transform:translateY(0); }
+.slide.vis .rev:nth-child(1){ transition-delay:.05s; }
+.slide.vis .rev:nth-child(2){ transition-delay:.12s; }
+.slide.vis .rev:nth-child(3){ transition-delay:.19s; }
+.slide.vis .rev:nth-child(4){ transition-delay:.26s; }
+.slide.vis .rev:nth-child(5){ transition-delay:.33s; }
+.slide.vis .rev:nth-child(6){ transition-delay:.40s; }
+
+/* ── Progress bar ── */
+#prog {
+  position:fixed; top:0; left:0; height:3px;
+  background:var(--accent); width:0%; z-index:1000;
+  transition:width .35s ease;
+}
+
+/* ── Nav dots ── */
+#dots {
+  position:fixed; right:clamp(7px,1.2vw,15px); top:50%;
+  transform:translateY(-50%); display:flex;
+  flex-direction:column; gap:6px; z-index:1000;
+}
+.nd {
+  width:6px; height:6px; border-radius:50%;
+  background:rgba(255,255,255,.18); cursor:pointer;
+  border:none; padding:0; transition:all .3s ease;
+}
+.nd.on  { background:var(--accent); transform:scale(1.45); }
+.nd:hover { background:rgba(255,255,255,.5); }
+
+/* ── Responsive ── */
+@media(max-height:700px){
+  :root{ --p:clamp(.8rem,2.5vw,2rem); --g:clamp(.4rem,1.2vw,.9rem); }
+}
+@media(max-height:600px){ #dots,.sn{ display:none; } }
+@media(max-width:600px){
+  .g2,.g3,.g4,.gs{ grid-template-columns:1fr; }
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.01ms!important; transition-duration:.2s!important; }
+  html{ scroll-behavior:auto; }
+}
+</style>
+</head>
+<body>
+
+<div id="prog"></div>
+<nav id="dots"></nav>
+
+<!-- ══ 01 COVER ══════════════════════════════════ -->
+<section class="slide" id="s0">
+  <div class="sn">01</div>
+  <div class="bc">
+    <span class="bc-item on">소개</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner" style="justify-content:center">
+    <div style="max-width:min(90vw,760px)">
+      <div class="lbl rev">AI TF 공유 · 2026-05-20</div>
+      <h1 class="rev" style="margin:clamp(.35rem,1.2vh,.9rem) 0">
+        경쟁사 성장 모니터링<br>
+        <span style="color:var(--accent)">자동화 시스템</span>
+      </h1>
+      <p class="rev" style="max-width:500px;margin-bottom:var(--g)">
+        Meta 광고 · 공개방 수 · 정책/공지 · 앱 업데이트<br>
+        매일 09:00 KST 자동 수집 → Google Chat 리포트
+      </p>
+      <div class="rev" style="display:flex;gap:7px;flex-wrap:wrap">
+        <span class="badge bk">GitHub Actions</span>
+        <span class="badge bk">Playwright</span>
+        <span class="badge bk">Google Sheets</span>
+        <span class="badge bg">운영 중</span>
+      </div>
+    </div>
+    <div style="position:absolute;right:var(--p);bottom:var(--p);
+                width:clamp(100px,18vw,200px);height:clamp(100px,18vw,200px);
+                background:var(--accent);border-radius:50%;opacity:.06;
+                filter:blur(40px);pointer-events:none"></div>
+  </div>
+</section>
+
+<!-- ══ 02 배경 ════════════════════════════════════ -->
+<section class="slide" id="s1">
+  <div class="sn">02</div>
+  <div class="bc">
+    <span class="bc-item on">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev">배경</div>
+        <h2 class="rev">왜 만들었나?</h2>
+      </div>
+      <div class="g2 rev">
+        <div class="card w">
+          <div style="font-size:clamp(1.1rem,2vw,1.7rem);margin-bottom:7px">😓</div>
+          <h3 style="color:var(--warn);font-size:var(--tb);margin-bottom:5px">기존의 한계</h3>
+          <p style="font-size:var(--ts)">경쟁사 광고·앱 변화를 수작업 확인.<br>사람에 의존해 누락·지연 발생.</p>
+        </div>
+        <div class="card g">
+          <div style="font-size:clamp(1.1rem,2vw,1.7rem);margin-bottom:7px">🎯</div>
+          <h3 style="color:var(--green);font-size:var(--tb);margin-bottom:5px">목표</h3>
+          <p style="font-size:var(--ts)">매일 자동 수집 → Google Chat 리포트.<br>별도 작업 없이 경쟁사 동향 파악.</p>
+        </div>
+        <div class="card b">
+          <div style="font-size:clamp(1.1rem,2vw,1.7rem);margin-bottom:7px">📊</div>
+          <h3 style="color:#818CF8;font-size:var(--tb);margin-bottom:5px">수집 대상 4가지</h3>
+          <p style="font-size:var(--ts)">Meta 광고 집행 현황<br>공개방(숙박) 재고 수<br>정책/공지 변경<br>앱 버전 업데이트</p>
+        </div>
+        <div class="card p">
+          <div style="font-size:clamp(1.1rem,2vw,1.7rem);margin-bottom:7px">🔁</div>
+          <h3 style="color:var(--purple);font-size:var(--tb);margin-bottom:5px">완전 자동화</h3>
+          <p style="font-size:var(--ts)">GitHub Actions cron + Python + Playwright<br>데이터 누적 저장 → Looker Studio 예정</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 03 경쟁사 ══════════════════════════════════ -->
+<section class="slide" id="s2">
+  <div class="sn">03</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item on">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev">모니터링 대상</div>
+        <h2 class="rev">경쟁사 7개 커버리지</h2>
+      </div>
+      <div class="rev" style="overflow:hidden;flex:1">
+        <table class="tbl">
+          <thead>
+            <tr><th>경쟁사</th><th>Meta 광고</th><th>공개방 수</th><th>정책/공지</th><th>앱</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong style="color:#FF5A5F">Airbnb</strong></td><td><span class="badge bg">1계정</span></td><td><span class="badge bg">AirDNA 서울</span></td><td><span class="badge bg">수집</span></td><td><span class="badge bg">iOS+AOS</span></td></tr>
+            <tr><td><strong style="color:#1A9B6B">리브애니웨어</strong></td><td><span class="badge bg">1계정</span></td><td><span class="badge bg">서울/국내</span></td><td><span class="badge bg">수집</span></td><td><span class="badge bg">iOS+AOS</span></td></tr>
+            <tr><td><strong style="color:#3B82F6">엔코스테이</strong></td><td><span class="badge bg">1계정</span></td><td><span class="badge bg">국내</span></td><td><span class="badge bg">수집</span></td><td><span class="badge bg">iOS+AOS</span></td></tr>
+            <tr><td><strong style="color:#F59E0B">자리톡</strong></td><td><span class="badge bg">1계정</span></td><td><span class="badge bo">제외</span></td><td><span class="badge bo">제외</span></td><td><span class="badge bg">iOS+AOS</span></td></tr>
+            <tr><td><strong style="color:#8B5CF6">직방</strong></td><td><span class="badge bg">1계정</span></td><td><span class="badge bo">—</span></td><td><span class="badge bg">수집</span></td><td><span class="badge bg">iOS+AOS</span></td></tr>
+            <tr><td><strong style="color:#EC4899">미스터멘션</strong></td><td><span class="badge bg">1계정</span></td><td><span class="badge bo">—</span></td><td><span class="badge bg">수집</span></td><td><span class="badge bg">iOS+AOS</span></td></tr>
+            <tr><td><strong style="color:#9CA3AF">삼삼엠투</strong></td><td><span class="badge bg">2계정</span></td><td><span class="badge bo">—</span></td><td><span class="badge bg">수집</span></td><td><span class="badge bg">iOS+AOS</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="g4 rev">
+        <div class="stat"><div class="stat-n" style="color:var(--accent)">7</div><div class="stat-l">경쟁사</div></div>
+        <div class="stat"><div class="stat-n" style="color:var(--green)">8</div><div class="stat-l">Meta 계정</div></div>
+        <div class="stat"><div class="stat-n" style="color:var(--purple)">14</div><div class="stat-l">앱 (iOS+AOS)</div></div>
+        <div class="stat"><div class="stat-n" style="color:var(--warn)">4</div><div class="stat-l">수집 카테고리</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 04 아키텍처 ════════════════════════════════ -->
+<section class="slide" id="s3">
+  <div class="sn">04</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item on">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev">시스템 아키텍처</div>
+        <h2 class="rev">전체 데이터 흐름</h2>
+      </div>
+
+      <div class="rev">
+        <div style="font-size:var(--tl);color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">
+          ① COLLECT — GitHub Actions · 매일 09:00 KST
+        </div>
+        <div class="pipe">
+          <div class="pbox b">Meta<br>Ad Library<br><span style="opacity:.6;font-size:.88em">Playwright</span></div>
+          <div class="parr">→</div>
+          <div class="pbox w">공개방 수<br>AirDNA/<br>LA / Enco</div>
+          <div class="parr">→</div>
+          <div class="pbox p">정책/공지<br>HTML 파싱<br><span style="opacity:.6;font-size:.88em">Playwright</span></div>
+          <div class="parr">→</div>
+          <div class="pbox g">앱 버전<br>iTunes API<br>Play Store</div>
+        </div>
+      </div>
+
+      <div class="rev">
+        <div style="font-size:var(--tl);color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">② STORE</div>
+        <div class="pipe">
+          <div class="pbox" style="flex:4;border-color:rgba(74,108,247,.3)">
+            Google Sheets — 6개 탭 append-only 누적 저장
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;justify-content:center">
+              <span class="badge bk" style="font-size:.72em">meta_ad_counts</span>
+              <span class="badge bk" style="font-size:.72em">raw_supply_snapshots</span>
+              <span class="badge bk" style="font-size:.72em">policy_updates</span>
+              <span class="badge bk" style="font-size:.72em">app_versions</span>
+              <span class="badge bk" style="font-size:.72em">run_log</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rev">
+        <div style="font-size:var(--tl);color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">③ REPORT / VISUALIZE</div>
+        <div class="pipe">
+          <div class="pbox g">Google Chat<br>한국어 리포트<br><span style="opacity:.6;font-size:.88em">Webhook</span></div>
+          <div class="parr">→</div>
+          <div class="pbox b" style="opacity:.65">Looker Studio<br>대시보드<br><span style="opacity:.6;font-size:.88em">예정</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 05 Meta 광고 ══════════════════════════════ -->
+<section class="slide" id="s4">
+  <div class="sn">05</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item on">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev" style="color:#818CF8">수집 모듈 1 / 4</div>
+        <h2 class="rev">Meta Ad Library 수집</h2>
+      </div>
+      <div class="gs rev">
+        <div style="display:flex;flex-direction:column;gap:var(--ge)">
+          <div class="card b">
+            <h3 style="font-size:var(--ts);color:#818CF8;margin-bottom:5px">수집 방법</h3>
+            <p style="font-size:var(--ts)">Playwright → Facebook Ad Library 크롤링.<br>8개 계정 순차 실행.</p>
+          </div>
+          <div class="card">
+            <h3 style="font-size:var(--ts);color:var(--txt);margin-bottom:5px">displayed_meta_count</h3>
+            <p style="font-size:var(--ts)">화면 상단 <em>"결과 ~N개"</em> 파싱값.<br>Chat 리포트 공식 수치. <code>written</code>(행 수)와 절대 혼동 금지.</p>
+          </div>
+          <div class="card w">
+            <h3 style="font-size:var(--ts);color:var(--warn);margin-bottom:5px">30일 초과 광고</h3>
+            <p style="font-size:var(--ts)"><code>ad_start_date &lt; today − 1 month</code><br>정확히 한 달째는 포함 안 함.</p>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--ge)">
+          <div class="card">
+            <h3 style="font-size:var(--ts);color:var(--txt);margin-bottom:5px">전일 대비 증감</h3>
+            <p style="font-size:var(--ts)"><code>meta_ad_counts</code> 탭 기준.<br>이전 calendar date와 비교 (+N / −N).<br>같은 날 재실행은 비교 제외.</p>
+          </div>
+          <div class="card g">
+            <h3 style="font-size:var(--ts);color:var(--green);margin-bottom:5px">저장 탭 2개</h3>
+            <p style="font-size:var(--ts)">
+              <code>meta_ad_start_dates</code><br>
+              → 광고별 ID · URL · 시작일 · 소재<br><br>
+              <code>meta_ad_counts</code><br>
+              → 날짜별 / 경쟁사별 총 광고 수
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 06 공개방/정책/앱 ══════════════════════════ -->
+<section class="slide" id="s5">
+  <div class="sn">06</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item on">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev" style="color:var(--warn)">수집 모듈 2–4 / 4</div>
+        <h2 class="rev">공개방 수 · 정책/공지 · 앱 버전</h2>
+      </div>
+      <div class="g3 rev" style="flex:1;align-items:start">
+        <div class="card w" style="display:flex;flex-direction:column;gap:5px;height:100%">
+          <div style="font-size:clamp(1.1rem,2vw,1.6rem)">🏠</div>
+          <h3 style="font-size:var(--tb);color:var(--warn)">공개방 수</h3>
+          <p style="font-size:var(--ts)">
+            <strong style="color:var(--txt)">Airbnb</strong> — AirDNA Seoul<br>(로그인 세션 GPG 암호화)<br><br>
+            <strong style="color:var(--txt)">리브애니웨어</strong> — 검색결과 N건<br><br>
+            <strong style="color:var(--txt)">엔코스테이</strong> — 지도뷰 국내
+          </p>
+          <span class="badge bw" style="align-self:flex-start;margin-top:auto">raw_supply_snapshots</span>
+        </div>
+        <div class="card p" style="display:flex;flex-direction:column;gap:5px;height:100%">
+          <div style="font-size:clamp(1.1rem,2vw,1.6rem)">📋</div>
+          <h3 style="font-size:var(--tb);color:var(--purple)">정책/공지</h3>
+          <p style="font-size:var(--ts)">
+            6개 경쟁사 공지 페이지 HTML 파싱.<br>
+            최신 게시물 → 이전 값 diff.<br><br>
+            <code>is_new</code> / <code>is_changed</code> 플래그<br><br>
+            <span style="color:var(--txt3)">(자리톡 제외 — 파싱 불안정)</span>
+          </p>
+          <span class="badge bp" style="align-self:flex-start;margin-top:auto">policy_updates</span>
+        </div>
+        <div class="card g" style="display:flex;flex-direction:column;gap:5px;height:100%">
+          <div style="font-size:clamp(1.1rem,2vw,1.6rem)">📱</div>
+          <h3 style="font-size:var(--tb);color:var(--green)">앱 버전</h3>
+          <p style="font-size:var(--ts)">
+            <strong style="color:var(--txt)">iOS</strong> — iTunes Lookup API<br>(country=kr, 인증 불필요)<br><br>
+            <strong style="color:var(--txt)">Android</strong> — Play Store Playwright<br>앱 정보 팝업 → 버전/업데이트일<br>새로운 기능 → release_notes
+          </p>
+          <span class="badge bg" style="align-self:flex-start;margin-top:auto">app_versions</span>
+        </div>
+      </div>
+      <div class="rev" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:var(--ts);color:var(--txt3)">변경 감지 플래그:</span>
+        <code style="font-size:var(--ts);color:var(--green)">is_new_version</code>
+        <code style="font-size:var(--ts);color:#818CF8">is_changed</code>
+        <code style="font-size:var(--ts);color:var(--warn)">change_summary_ko</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 07 Google Sheets ══════════════════════════ -->
+<section class="slide" id="s6">
+  <div class="sn">07</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item on">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev" style="color:var(--green)">저장소</div>
+        <h2 class="rev">Google Sheets — 6개 탭</h2>
+      </div>
+      <div class="rev" style="overflow:hidden;flex:1">
+        <table class="tbl">
+          <thead>
+            <tr><th>탭 이름</th><th>주요 컬럼</th><th>역할</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code style="color:#818CF8">meta_ad_start_dates</code></td><td style="color:var(--txt3)">ad_id · url · ad_start_date · ad_text</td><td>광고 단건 히스토리 (13컬럼)</td></tr>
+            <tr><td><code style="color:#818CF8">meta_ad_counts</code></td><td style="color:var(--txt3)">date · competitor · displayed_count · delta</td><td>날짜별 광고 수 추이 (8컬럼)</td></tr>
+            <tr><td><code style="color:var(--warn)">raw_supply_snapshots</code></td><td style="color:var(--txt3)">date · platform · region · count · method</td><td>공개방 수 스냅샷 (13컬럼)</td></tr>
+            <tr><td><code style="color:var(--purple)">policy_updates</code></td><td style="color:var(--txt3)">date · competitor · title · is_new · is_changed</td><td>정책 변경 추적 (16컬럼)</td></tr>
+            <tr><td><code style="color:var(--green)">app_versions</code></td><td style="color:var(--txt3)">date · competitor · platform · version · is_new_version</td><td>앱 버전 변경 추적 (16컬럼)</td></tr>
+            <tr><td><code style="color:var(--txt3)">run_log</code></td><td style="color:var(--txt3)">run_id · started_at · finished_at · failed_count</td><td>실행 결과 로그 (10컬럼)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="rev" style="font-size:var(--ts);color:var(--txt3)">
+        모든 탭 <strong style="color:var(--txt2)">append-only 누적 저장</strong> — 히스토리 분석 / Looker Studio 원본 데이터로 활용
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 08 GitHub Actions ═════════════════════════ -->
+<section class="slide" id="s7">
+  <div class="sn">08</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item on">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev" style="color:var(--purple)">자동화</div>
+        <h2 class="rev">GitHub Actions 파이프라인</h2>
+      </div>
+      <div class="g2 rev">
+        <div style="display:flex;flex-direction:column;gap:var(--ge)">
+          <div class="card p">
+            <h3 style="font-size:var(--ts);color:var(--purple);margin-bottom:6px">실행 스케줄</h3>
+            <p style="font-size:var(--ts);line-height:1.9">
+              <code>0 0 * * *</code> → <strong style="color:var(--txt)">매일 09:00 KST</strong><br>
+              <code>30 3 * * *</code> → 12:30 KST (테스트, 임시)<br>
+              <code>workflow_dispatch</code> → 수동 실행
+            </p>
+          </div>
+          <div class="card">
+            <h3 style="font-size:var(--ts);color:var(--txt);margin-bottom:7px">실행 순서</h3>
+            <div class="pipe" style="flex-wrap:nowrap;overflow:auto">
+              <div class="pbox b" style="font-size:.6em;padding:4px 5px;min-width:44px">Meta</div>
+              <div class="parr" style="font-size:.8em">→</div>
+              <div class="pbox w" style="font-size:.6em;padding:4px 5px;min-width:44px">공개방</div>
+              <div class="parr" style="font-size:.8em">→</div>
+              <div class="pbox p" style="font-size:.6em;padding:4px 5px;min-width:44px">정책</div>
+              <div class="parr" style="font-size:.8em">→</div>
+              <div class="pbox g" style="font-size:.6em;padding:4px 5px;min-width:44px">앱</div>
+              <div class="parr" style="font-size:.8em">→</div>
+              <div class="pbox" style="font-size:.6em;padding:4px 5px;min-width:44px">Chat</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--ge)">
+          <div class="card">
+            <h3 style="font-size:var(--ts);color:var(--txt);margin-bottom:6px">GitHub Secrets 4개</h3>
+            <p style="font-size:var(--ts);line-height:1.9">
+              <code>GOOGLE_SHEET_ID</code><br>
+              <code>GOOGLE_CHAT_WEBHOOK_URL</code><br>
+              <code>GOOGLE_SERVICE_ACCOUNT_JSON</code><br>
+              <code>AIRDNA_STATE_PASSPHRASE</code>
+            </p>
+          </div>
+          <div class="card w">
+            <h3 style="font-size:var(--ts);color:var(--warn);margin-bottom:6px">AirDNA 세션 관리</h3>
+            <p style="font-size:var(--ts)">
+              GPG AES256 암호화 → <code>airdna_state.json.gpg</code> 커밋.<br>
+              passphrase → GitHub Secret 보관.<br>
+              <span style="color:var(--red)">raw 세션 파일 절대 커밋 금지.</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 09 Chat 리포트 ══════════════════════════ -->
+<section class="slide" id="s8">
+  <div class="sn">09</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item on">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev" style="color:var(--green)">리포트</div>
+        <h2 class="rev">Google Chat 일일 리포트</h2>
+      </div>
+      <div class="term rev" style="flex:1;overflow:auto">
+        <div><span class="b">경쟁사 모니터링 일일 리포트</span> <span class="d">(2026-05-20)</span></div><br>
+        <div><span class="b">[Meta 광고]</span></div>
+        <div>• Airbnb: <span class="b">120개</span> <span class="up">(+2개)</span> &nbsp;• 리브애니웨어: <span class="b">24개</span> <span class="d">(변동 없음)</span></div>
+        <div>• 엔코스테이: <span class="b">18개</span> <span class="dn">(-1개)</span> &nbsp;• 자리톡: <span class="b">33개</span> <span class="up">(+1개)</span></div>
+        <div>• 직방: <span class="b">45개</span> <span class="d">(변동 없음)</span> &nbsp;• 미스터멘션: <span class="b">12개</span> <span class="d">(변동 없음)</span></div>
+        <div>• 삼삼엠투: <span class="b">9개</span> <span class="d">(변동 없음)</span></div><br>
+        <div><span class="b">[Meta 30일 초과 광고]</span></div>
+        <div>• Airbnb: <span class="b">8개</span> &nbsp;• 리브애니웨어: <span class="b">3개</span> &nbsp;• 자리톡: <span class="b">5개</span></div><br>
+        <div><span class="b">[공개방 수]</span></div>
+        <div>• Airbnb: 서울 <span class="b">1,234개</span></div>
+        <div>• 리브애니웨어: 서울 <span class="b">312개</span> / 국내 <span class="b">789개</span></div>
+        <div>• 엔코스테이: 국내 <span class="b">452개</span></div><br>
+        <div><span class="b">[정책/공지]</span></div>
+        <div>• Airbnb: <span class="d">변경 없음</span> &nbsp;• 리브애니웨어: <span class="nw">신규 감지</span> &nbsp;• 직방: <span class="d">변경 없음</span></div><br>
+        <div><span class="b">[앱 업데이트]</span></div>
+        <div>• Airbnb iOS: <span class="b">v26.20</span> / <span class="d">변경 없음</span></div>
+        <div>• 리브애니웨어 iOS: <span class="b">v3.11.4</span> / <span class="nw">버전 변경: 3.11.3 → 3.11.4</span></div>
+        <div>• 직방 AOS: <span class="b">v6.8.1</span> / <span class="d">변경 없음</span></div><br>
+        <div class="d">실패: 0건 | 완료: 2026-05-20 00:04 UTC</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 10 기술 스택 ═══════════════════════════════ -->
+<section class="slide" id="s9">
+  <div class="sn">10</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item on">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev">기술 스택</div>
+        <h2 class="rev">구현 기술 상세</h2>
+      </div>
+      <div class="g2 rev">
+        <div class="card">
+          <h3 style="font-size:var(--ts);color:#818CF8;margin-bottom:7px">수집 레이어</h3>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px">
+            <span class="badge bk">Playwright</span><span class="badge bk">requests</span><span class="badge bk">BeautifulSoup</span>
+          </div>
+          <p style="font-size:var(--ts)">
+            Meta Ad Library — headless 스크롤 크롤링<br>
+            Google Play — 앱 정보 팝업 클릭 자동화<br>
+            iTunes Lookup — 경량 API (인증 불필요)<br>
+            AirDNA — GPG 세션 파일 복원 후 실행
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="font-size:var(--ts);color:var(--green);margin-bottom:7px">저장 / 전송</h3>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px">
+            <span class="badge bg">Sheets API v4</span><span class="badge bg">Chat Webhook</span>
+          </div>
+          <p style="font-size:var(--ts)">
+            서비스 계정 JSON 인증 (Actions Secret)<br>
+            Sheet append — 중복 없이 누적<br>
+            Chat — 섹션별 한국어 마크다운 포맷
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="font-size:var(--ts);color:var(--purple);margin-bottom:7px">오케스트레이션</h3>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px">
+            <span class="badge bp">GitHub Actions</span><span class="badge bo">Python venv</span>
+          </div>
+          <p style="font-size:var(--ts)">
+            <code>run_daily.py</code> — 4개 collector 순차 실행<br>
+            실패 시 run_log 기록 후 계속 진행 (partial ok)<br>
+            로컬: <code>bash scripts/run_daily_local.sh</code>
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="font-size:var(--ts);color:var(--warn);margin-bottom:7px">설정 파일 (config/)</h3>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px">
+            <span class="badge bw">YAML</span>
+          </div>
+          <p style="font-size:var(--ts)">
+            <code>app_sources.yaml</code> iOS App ID / AOS 패키지<br>
+            <code>supply_sources.yaml</code> 방 개수 URL<br>
+            <code>policy_pages.yaml</code> 공지 URL<br>
+            경쟁사 추가 = YAML 수정만으로 확장 가능
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 11 운영 현황 ════════════════════════════════ -->
+<section class="slide" id="s10">
+  <div class="sn">11</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item on">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev" style="color:var(--green)">운영 현황</div>
+        <h2 class="rev">현재 상태 (2026-05-20)</h2>
+      </div>
+      <div class="g2 rev">
+        <div style="display:flex;flex-direction:column;gap:var(--ge)">
+          <div style="font-size:var(--ts);color:var(--txt3);margin-bottom:2px">수집 모듈 상태</div>
+          <div class="srow"><span>Meta 광고 수집</span><span class="badge bg">운영 중</span></div>
+          <div class="srow"><span>공개방 수 수집</span><span class="badge bg">운영 중</span></div>
+          <div class="srow"><span>정책/공지 수집</span><span class="badge bg">운영 중</span></div>
+          <div class="srow"><span>앱 버전 수집</span><span class="badge bg">운영 중</span></div>
+          <div class="srow"><span>Google Chat 리포트</span><span class="badge bg">운영 중</span></div>
+          <div class="srow"><span>GitHub Actions 스케줄</span><span class="badge bg">운영 중</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--ge)">
+          <div style="font-size:var(--ts);color:var(--txt3);margin-bottom:2px">알려진 제한사항</div>
+          <div class="card w" style="padding:clamp(6px,.9vw,9px) clamp(8px,1.1vw,12px)">
+            <p style="font-size:var(--ts)"><strong style="color:var(--warn)">직방 Android</strong> — headless에서 새로운 기능 미수집 → release_notes 빈칸 허용</p>
+          </div>
+          <div class="card w" style="padding:clamp(6px,.9vw,9px) clamp(8px,1.1vw,12px)">
+            <p style="font-size:var(--ts)"><strong style="color:var(--warn)">자리톡 Android</strong> — "기기에 따라 다릅니다" → 버전 파싱 불가, release_date 기준 ok</p>
+          </div>
+          <div class="card w" style="padding:clamp(6px,.9vw,9px) clamp(8px,1.1vw,12px)">
+            <p style="font-size:var(--ts)"><strong style="color:var(--warn)">AirDNA 세션</strong> — 만료 시 수동 갱신 필요. GPG 재암호화 후 커밋.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 12 로드맵 ═══════════════════════════════════ -->
+<section class="slide" id="s11">
+  <div class="sn">12</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item on">현황</span>
+  </div>
+  <div class="slide-inner">
+    <div class="content">
+      <div>
+        <div class="lbl rev" style="color:var(--purple)">로드맵</div>
+        <h2 class="rev">다음 단계</h2>
+      </div>
+      <div class="tl rev">
+        <div class="tl-row">
+          <div class="dot g"></div>
+          <div class="tl-txt"><strong>완료</strong> — Meta 광고 / 공개방 수 / 정책/공지 / 앱 버전 수집 자동화.<br>Google Sheets 누적 저장 · Google Chat 일일 리포트 · GitHub Actions 09:00 KST 정기 실행.</div>
+        </div>
+        <div class="tl-row">
+          <div class="dot"></div>
+          <div class="tl-txt"><strong>단기</strong> — 12:30 KST 테스트 schedule 확인 후 cron 제거 · meta_ad_counts 전일 대비 정상 동작 검증.</div>
+        </div>
+        <div class="tl-row">
+          <div class="dot p"></div>
+          <div class="tl-txt"><strong style="color:var(--purple)">중기 — Looker Studio 연결</strong><br>Google Sheets를 원본으로 연결, 광고 수 추이 · 앱 업데이트 빈도 · 공개방 수 변화 대시보드 구축.</div>
+        </div>
+        <div class="tl-row">
+          <div class="dot w"></div>
+          <div class="tl-txt"><strong>검토 중</strong> — AirDNA 세션 자동 갱신 · 신규 경쟁사 추가 (YAML + 5단계 체크리스트) · Slack 연동 검토.</div>
+        </div>
+      </div>
+      <div class="g3 rev">
+        <div class="stat"><div class="stat-n" style="color:var(--accent)">7</div><div class="stat-l">경쟁사 커버</div></div>
+        <div class="stat"><div class="stat-n" style="color:var(--green)">4</div><div class="stat-l">수집 카테고리</div></div>
+        <div class="stat"><div class="stat-n" style="color:var(--purple);font-size:clamp(1.1rem,2.2vw,1.9rem)">매일 자동</div><div class="stat-l">인력 개입 0</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 13 Q&A ══════════════════════════════════ -->
+<section class="slide" id="s12">
+  <div class="sn">13</div>
+  <div class="bc">
+    <span class="bc-item">배경</span>
+    <span class="bc-item">대상</span>
+    <span class="bc-item">구조</span>
+    <span class="bc-item">수집</span>
+    <span class="bc-item">자동화</span>
+    <span class="bc-item">현황</span>
+  </div>
+  <div class="slide-inner" style="justify-content:center;align-items:center;text-align:center">
+    <!-- glow -->
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+                width:min(60vw,500px);height:min(60vw,500px);
+                background:radial-gradient(circle,rgba(74,108,247,.07) 0%,transparent 70%);
+                pointer-events:none;z-index:0"></div>
+    <div style="max-width:min(90vw,580px);position:relative;z-index:1">
+      <div class="lbl rev">감사합니다</div>
+      <h1 class="rev" style="margin:clamp(.25rem,1.2vh,.7rem) 0">Q &amp; A</h1>
+      <p class="rev">경쟁사 추가 · 수집 항목 확장 · 대시보드 연동<br>어떤 방향이 가장 필요한지 의견 공유 부탁드립니다.</p>
+      <hr class="rev" style="margin:var(--g) auto;max-width:280px;opacity:.15">
+      <div class="g3 rev" style="max-width:460px;margin:0 auto">
+        <div class="card" style="text-align:center">
+          <div style="font-size:var(--ts);color:var(--txt3);margin-bottom:4px">REPO</div>
+          <div style="font-size:var(--ts)">competitive-<br>growth-monitor</div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:var(--ts);color:var(--txt3);margin-bottom:4px">DATA</div>
+          <div style="font-size:var(--ts)">Google Sheets<br>6탭 누적</div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:var(--ts);color:var(--txt3);margin-bottom:4px">REPORT</div>
+          <div style="font-size:var(--ts)">매일 09:00<br>Google Chat</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ═══════════════════════════════════════
+   SlidePresentation — frontend-slides pattern
+═══════════════════════════════════════ */
+class SlidePresentation {
+  constructor() {
+    this.slides = Array.from(document.querySelectorAll('.slide'));
+    this.total  = this.slides.length;
+    this.cur    = 0;
+    this.prog   = document.getElementById('prog');
+    this.dotsEl = document.getElementById('dots');
+    this.touchY = 0;
+    this.touchX = 0;
+    this._setupDots();
+    this._setupObserver();
+    this._setupKeys();
+    this._setupTouch();
+    this._setupWheel();
+    this._updateProgress(0);
+  }
+
+  _setupDots() {
+    this.dotsEl.innerHTML = '';
+    this.slides.forEach((_, i) => {
+      const b = document.createElement('button');
+      b.className = 'nd' + (i === 0 ? ' on' : '');
+      b.setAttribute('aria-label', `슬라이드 ${i + 1}`);
+      b.addEventListener('click', () => this.goto(i));
+      this.dotsEl.appendChild(b);
+    });
+  }
+
+  _setupObserver() {
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('vis');
+          const i = this.slides.indexOf(e.target);
+          if (i !== -1) {
+            this.cur = i;
+            this._updateProgress(i);
+            this._updateDots(i);
+          }
+        }
+      });
+    }, { threshold: 0.5 });
+    this.slides.forEach(s => obs.observe(s));
+  }
+
+  _setupKeys() {
+    document.addEventListener('keydown', e => {
+      const next = ['ArrowDown','ArrowRight',' ','PageDown'];
+      const prev = ['ArrowUp','ArrowLeft','PageUp'];
+      if (next.includes(e.key))       { e.preventDefault(); this.next(); }
+      else if (prev.includes(e.key))  { e.preventDefault(); this.prev(); }
+      else if (e.key === 'Home')      { e.preventDefault(); this.goto(0); }
+      else if (e.key === 'End')       { e.preventDefault(); this.goto(this.total - 1); }
+    });
+  }
+
+  _setupTouch() {
+    document.addEventListener('touchstart', e => {
+      this.touchY = e.touches[0].clientY;
+      this.touchX = e.touches[0].clientX;
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const dy = this.touchY - e.changedTouches[0].clientY;
+      const dx = this.touchX - e.changedTouches[0].clientX;
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 50) {
+        dy > 0 ? this.next() : this.prev();
+      }
+    }, { passive: true });
+  }
+
+  _setupWheel() {
+    let t;
+    document.addEventListener('wheel', e => {
+      e.preventDefault();
+      clearTimeout(t);
+      t = setTimeout(() => { e.deltaY > 0 ? this.next() : this.prev(); }, 50);
+    }, { passive: false });
+  }
+
+  next() { if (this.cur < this.total - 1) this.goto(this.cur + 1); }
+  prev() { if (this.cur > 0)              this.goto(this.cur - 1); }
+
+  goto(i) {
+    if (i < 0 || i >= this.total) return;
+    this.slides[i].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  _updateProgress(i) {
+    this.prog.style.width = (this.total > 1 ? (i / (this.total - 1)) * 100 : 100) + '%';
+  }
+
+  _updateDots(active) {
+    this.dotsEl.querySelectorAll('.nd').forEach((d, i) =>
+      d.classList.toggle('on', i === active));
+  }
+}
+
+new SlidePresentation();
+</script>
+</body>
+</html>
